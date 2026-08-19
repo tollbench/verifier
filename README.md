@@ -4,15 +4,32 @@ A single, dependency-free Python 3 script that recomputes the Toll Bench
 headline figures from the public data file — so anyone can check the board
 against the public record.
 
+[![verify](https://github.com/tollbench/verifier/actions/workflows/verify.yml/badge.svg)](https://github.com/tollbench/verifier/actions/workflows/verify.yml)
+
+The badge above is the whole point: a scheduled GitHub run rebuilds the board
+from the public dataset and compares it against the live site. Green means a
+stranger's recomputation matches what Toll Bench publishes.
+
 ## Usage
 
 ```
 python3 verify.py deals.csv
+python3 verify.py receipts.jsonl
+python3 verify.py deals.csv --live https://tollbench.com
 ```
 
 Give it a copy of `data/deals.csv` from
-[`tollbench/toll-bench-data`](https://github.com/tollbench/toll-bench-data). It
-reads only that file and prints a JSON report.
+[`tollbench/toll-bench-data`](https://github.com/tollbench/toll-bench-data),
+or the live `receipts.jsonl` from
+`https://tollbench.com/api/bench/receipts.jsonl`. It reads only that file and
+prints a JSON report.
+
+With `--live <base-url>`, it also fetches `<base>/api/bench/board.json` — the
+board recomputed from the bench's own ledger on request — and compares it
+figure by figure against the recomputation from the file. Any disagreement is
+listed and the exit code is 1. (A transient disagreement means the GitHub
+mirror is behind the ledger; the bench's weekly self-check repairs the repo,
+and the ledger always wins.)
 
 ## What it recomputes
 
@@ -29,4 +46,4 @@ reads only that file and prints a JSON report.
 Definitions follow the paper:
 https://bookofhouses.com/static/toll-bench.html
 
-Stdlib only (`csv`, `statistics`, `json`). No install step.
+Stdlib only (`csv`, `statistics`, `json`, `urllib`). No install step.

@@ -1,11 +1,21 @@
 #!/usr/bin/env python3
 """Toll Bench verifier (spec v1, §10).
 
-Reads ONLY the public file data/deals.csv and recomputes every headline figure
-from it, so anyone can check the board against the public record. Stdlib only.
+Reads ONLY the public data — data/deals.csv from tollbench/toll-bench-data, or
+the live receipts.jsonl — and recomputes every headline figure from it, so
+anyone can check the board against the public record. Stdlib only.
 
 Usage:
     python3 verify.py deals.csv
+    python3 verify.py receipts.jsonl
+    python3 verify.py deals.csv --live https://tollbench.com
+
+With --live, the script also fetches <base>/api/bench/board.json — the board
+recomputed from the bench's own ledger on request — and compares it against
+this recomputation from the public file. A match is printed and the exit code
+is 0; any disagreement lists every differing figure and exits 1. That
+comparison is the whole point: the leaderboard, rebuilt by a stranger from
+public data, checks out against the live site or the run goes red.
 
 Definitions (from the paper, https://bookofhouses.com/static/toll-bench.html):
   S  success rate per agent      = (1/n) * sum(outcome)              [eq. 2]
@@ -25,6 +35,7 @@ import csv
 import json
 import statistics
 import sys
+import urllib.request
 
 
 def _f(v):
@@ -47,6 +58,8 @@ def band_of(p):
 
 def load(path):
     with open(path, newline='', encoding='utf-8') as fh:
+        if path.endswith('.jsonl'):
+            return [json.loads(line) for line in fh if line.strip()]
         return list(csv.DictReader(fh))
 
 
@@ -100,7 +113,7 @@ def verify(rows):
             d['t'].append(t)
         if c is not None:
             d['c'].append(c)
-        if (r.get('lane') or '').strip() == 'free':
+        if (str(r.get('lane') or '')).strip() == 'free':
             d['free'] += 1
     for b, d in bands.items():
         out['by_band'][b] = {
@@ -147,12 +160,65 @@ def verify(rows):
     return out
 
 
+# ---------------------------------------------------------------------------
+# --live: compare this recomputation against the site's own board.json
+# ---------------------------------------------------------------------------
+
+LIVE_KEYS = ('row_count', 'by_agent', 'by_week', 'by_band', 'by_model')
+
+
+def _diff(path, ours, live, out):
+    if isinstance(ours, dict) and isinstance(live, dict):
+        for k in sorted(set(ours) | set(live)):
+            _diff(f'{path}.{k}', ours.get(k), live.get(k), out)
+        return
+    a, b = _f(ours), _f(live)
+    if a is not None and b is not None:
+        if abs(a - b) > 1e-6:
+            out.append(f'{path}: file={ours} live={live}')
+        return
+    if ours != live:
+        out.append(f'{path}: file={ours!r} live={live!r}')
+
+
+def compare_live(ours, base):
+    url = base.rstrip('/') + '/api/bench/board.json'
+    with urllib.request.urlopen(url, timeout=30) as resp:
+        live = json.load(resp)
+    diffs = []
+    for key in LIVE_KEYS:
+        _diff(key, ours.get(key), live.get(key), diffs)
+    return url, diffs
+
+
 def main():
-    if len(sys.argv) != 2:
-        sys.stderr.write('usage: python3 verify.py deals.csv\n')
+    args = [a for a in sys.argv[1:]]
+    live_base = None
+    if '--live' in args:
+        i = args.index('--live')
+        try:
+            live_base = args[i + 1]
+        except IndexError:
+            sys.stderr.write('--live needs a base URL\n')
+            return 2
+        del args[i:i + 2]
+    if len(args) != 1:
+        sys.stderr.write('usage: python3 verify.py <deals.csv|receipts.jsonl> '
+                         '[--live https://tollbench.com]\n')
         return 2
-    rows = load(sys.argv[1])
-    print(json.dumps(verify(rows), indent=2, sort_keys=True))
+
+    rows = load(args[0])
+    report = verify(rows)
+    print(json.dumps(report, indent=2, sort_keys=True))
+
+    if live_base:
+        url, diffs = compare_live(report, live_base)
+        if diffs:
+            print(f'\nMISMATCH against {url}:')
+            for d in diffs:
+                print('  ' + d)
+            return 1
+        print(f'\nMATCH: the board rebuilt from {args[0]} agrees with {url}')
     return 0
 
 
