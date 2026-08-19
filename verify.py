@@ -13,7 +13,7 @@ Definitions (from the paper, https://bookofhouses.com/static/toll-bench.html):
   W  week points per week        = sum(outcome - p_frozen) over that week's
                                     resolutions                       [eq. 10]
   Toll per band (over DELIVERED targets in the band):
-       median agent-court time in agent-days,
+       median agent-court time in whole floored minutes,
        median cost to the person in USD,
        count of crossings, and share delivered at $0 (free share).
 
@@ -92,7 +92,7 @@ def verify(rows):
         o = _f(r.get('outcome'))
         if o != 1:
             continue
-        t = _f(r.get('T_agent_days'))
+        t = _f(r.get('T_agent_minutes'))
         c = _f(r.get('C_usd'))
         d = bands.setdefault(b, {'t': [], 'c': [], 'n': 0, 'free': 0})
         d['n'] += 1
@@ -105,8 +105,8 @@ def verify(rows):
     for b, d in bands.items():
         out['by_band'][b] = {
             'crossings': d['n'],
-            'median_agent_days': (round(statistics.median(d['t']), 2)
-                                  if d['t'] else None),
+            'median_agent_minutes': (round(statistics.median(d['t']), 2)
+                                     if d['t'] else None),
             'median_cost_usd': (round(statistics.median(d['c']), 2)
                                 if d['c'] else None),
             'free_share': (round(d['free'] / d['n'], 4) if d['n'] else None),
