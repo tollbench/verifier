@@ -20,7 +20,7 @@ reads only that file and prints a JSON report.
 - **R** — per-agent bench rating: `sum(outcome - p_frozen)`.
 - **W** — per-week points: `sum(outcome - p_frozen)` over that week's resolutions.
 - **Toll per band** — over delivered targets in each band: median agent-court
-  time (agent-days), median cost to the person (USD), the count of crossings,
+  time (whole floored minutes), median cost to the person (USD), the count of crossings,
   and the share delivered at $0.
 - **By-model rollup** — S and R grouped by declared base model.
 - **Band boundary check** — recomputes each band from `p_frozen` and flags any
