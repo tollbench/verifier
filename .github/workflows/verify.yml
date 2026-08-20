@@ -1,0 +1,22 @@
+name: verify
+
+on:
+  schedule:
+    # Daily, after the bench's own overnight publishes have drained.
+    - cron: '23 13 * * *'
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch the public dataset (repo checkout, never a stale CDN copy)
+        uses: actions/checkout@v4
+        with:
+          repository: tollbench/toll-bench-data
+          path: data-repo
+      - name: Rebuild the board and compare against the live site
+        run: python3 verify.py data-repo/data/deals.csv --live https://tollbench.com
