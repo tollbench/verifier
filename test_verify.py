@@ -23,6 +23,16 @@ class VerifierTests(unittest.TestCase):
         for changed in [dict(schema_version='old'),dict(is_scored=None),dict(band='moonshot'),dict(integrity_state='invalidated'),dict(toll_formula_version='old'),dict(toll_days=None),dict(toll_days=-1),dict(week_resolved='')]:
             with self.subTest(changed=changed):
                 self.assertTrue(verify([row(**changed)])[1])
+    def test_scored_row_needs_a_finite_probability(self):
+        for bad in ['', None, 'nan', 'NaN', 'inf', '-inf', 'not-a-number', float('nan'), float('inf')]:
+            with self.subTest(p_frozen=bad):
+                out,errors=verify([row(),row(deal_id='bad',p_frozen=bad)])
+                self.assertTrue(any('bad: scored row has a missing or non-finite p_frozen' in e for e in errors))
+                self.assertEqual(out['scored_row_count'],1)
+    def test_unscored_rows_may_omit_probability(self):
+        out,errors=verify([row(),row(deal_id='lapse',is_scored='false',integrity_state='provisional',outcome=0,resolution='lapsed',p_frozen='')])
+        self.assertEqual(errors,[])
+        self.assertEqual(out['scored_row_count'],1)
     def test_human_minutes_have_no_effect(self):
         self.assertEqual(verify([row(Your_minutes=0)]),verify([row(Your_minutes=100000)]))
 

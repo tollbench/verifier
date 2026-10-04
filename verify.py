@@ -67,7 +67,12 @@ def verify(rows):
         if outcome not in (0, 1):
             errors.append(f'{label}: outcome must be 0 or 1')
             continue
-        if p is not None and (not 0 <= p <= 1 or band_of(p) != row.get('band')):
+        if p is None:
+            # A scored row must carry its frozen probability: a blank, NaN or
+            # infinite p_frozen would silently drop out of every points total.
+            errors.append(f'{label}: scored row has a missing or non-finite p_frozen')
+            continue
+        if not 0 <= p <= 1 or band_of(p) != row.get('band'):
             errors.append(f'{label}: probability/band mismatch')
         if not row.get('week_resolved'):
             errors.append(f'{label}: scored outcome has no resolution week')
